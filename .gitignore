@@ -62,3 +62,6 @@ Thumbs.db
 .vs/
 .idea/
 *.swp
+
+# Local launcher publish output
+artifacts/
