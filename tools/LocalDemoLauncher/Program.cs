@@ -20,9 +20,7 @@ Console.WriteLine();
 
 try
 {
-    Require("git", "--version", "Git is required: https://git-scm.com/downloads");
-    Require("dotnet", "--version", ".NET 10 SDK is required: https://dotnet.microsoft.com/download");
-    Require("npm", "--version", "Node.js/npm is required: https://nodejs.org/");
+    EnsureCorePrerequisites();
 
     while (true)
     {
@@ -69,7 +67,7 @@ catch (Exception ex)
 
 void ProvisionAzureOpenAiAndRun()
 {
-    Require("az", "--version", "Azure CLI is required for provisioning: https://learn.microsoft.com/cli/azure/install-azure-cli");
+    EnsureAzureCli();
 
     Header("Consent required");
     Warn("This will sign you into Azure and create resources in your Azure subscription.");
@@ -226,6 +224,7 @@ void Cleanup()
         var state = JsonSerializer.Deserialize<DemoState>(File.ReadAllText(stateFile));
         if (state is not null && !string.IsNullOrWhiteSpace(state.ResourceGroupName))
         {
+            EnsureAzureCli();
             EnsureAzureLogin();
             Run("az", $"group delete --name {Quote(state.ResourceGroupName)} --yes --no-wait --only-show-errors", repoRoot);
             Line($"Resource group deletion requested: {state.ResourceGroupName}");
@@ -298,10 +297,95 @@ void SaveState(DemoState state)
 
 string Azure(string arguments) => RunCapture("az", arguments, repoRoot);
 
-static void Require(string command, string args, string help)
+void EnsureCorePrerequisites()
 {
-    try { Run(command, args, Directory.GetCurrentDirectory(), quiet: true); }
-    catch { throw new InvalidOperationException(help); }
+    Header("Checking prerequisites");
+    EnsureTool(
+        command: "git",
+        args: "--version",
+        displayName: "Git",
+        wingetId: "Git.Git",
+        installUrl: "https://git-scm.com/downloads",
+        required: true);
+    EnsureTool(
+        command: "dotnet",
+        args: "--version",
+        displayName: ".NET 10 SDK",
+        wingetId: "Microsoft.DotNet.SDK.10",
+        installUrl: "https://dotnet.microsoft.com/download",
+        required: true);
+    EnsureTool(
+        command: "npm",
+        args: "--version",
+        displayName: "Node.js/npm",
+        wingetId: "OpenJS.NodeJS.LTS",
+        installUrl: "https://nodejs.org/",
+        required: true);
+
+    if (TryCommand("az", "--version"))
+    {
+        Line("OK: Azure CLI");
+    }
+    else
+    {
+        Warn("Azure CLI is not currently visible to this launcher. It is only required for option 1 (provision) and option 4 (cleanup).");
+    }
+}
+
+void EnsureAzureCli()
+{
+    EnsureTool(
+        command: "az",
+        args: "--version",
+        displayName: "Azure CLI",
+        wingetId: "Microsoft.AzureCLI",
+        installUrl: "https://learn.microsoft.com/cli/azure/install-azure-cli",
+        required: true);
+}
+
+void EnsureTool(string command, string args, string displayName, string wingetId, string installUrl, bool required)
+{
+    if (TryCommand(command, args))
+    {
+        Line($"OK: {displayName}");
+        return;
+    }
+
+    Warn($"Missing: {displayName}");
+    Warn($"Install documentation: {installUrl}");
+
+    if (!required) return;
+
+    if (OperatingSystem.IsWindows() && TryCommand("winget", "--version"))
+    {
+        Console.Write($"Install {displayName} now using winget? Type INSTALL to continue, or press Enter to cancel: ");
+        if (string.Equals(Console.ReadLine()?.Trim(), "INSTALL", StringComparison.OrdinalIgnoreCase))
+        {
+            Run("winget", $"install --id {wingetId} --exact --source winget --accept-source-agreements --accept-package-agreements", Directory.GetCurrentDirectory());
+            if (TryCommand(command, args))
+            {
+                Line($"OK: {displayName}");
+                return;
+            }
+
+            throw new InvalidOperationException($"{displayName} was installed, but this terminal cannot see it yet. Close this window, open a new terminal, and run the launcher again.");
+        }
+    }
+
+    throw new InvalidOperationException($"{displayName} is required. Install it from {installUrl}, open a new terminal, and run the launcher again.");
+}
+
+static bool TryCommand(string command, string args)
+{
+    try
+    {
+        Run(command, args, Directory.GetCurrentDirectory(), quiet: true);
+        return true;
+    }
+    catch
+    {
+        return false;
+    }
 }
 
 static string RunCapture(string fileName, string arguments, string workingDirectory)
@@ -344,9 +428,18 @@ static void Run(string fileName, string arguments, string workingDirectory, bool
 
 static (string FileName, string Arguments) NormalizeCommand(string fileName, string arguments)
 {
-    return OperatingSystem.IsWindows() && fileName.Equals("npm", StringComparison.OrdinalIgnoreCase)
-        ? ("cmd.exe", $"/c npm {arguments}")
-        : (fileName, arguments);
+    if (!OperatingSystem.IsWindows()) return (fileName, arguments);
+
+    // npm and az are commonly exposed as .cmd shims on Windows. Running through
+    // cmd.exe mirrors what users see in Command Prompt and avoids false
+    // "missing prerequisite" failures when ProcessStartInfo cannot resolve .cmd.
+    if (fileName.Equals("npm", StringComparison.OrdinalIgnoreCase) ||
+        fileName.Equals("az", StringComparison.OrdinalIgnoreCase))
+    {
+        return ("cmd.exe", $"/c {fileName} {arguments}");
+    }
+
+    return (fileName, arguments);
 }
 
 static string Quote(string value) => $"\"{value.Replace("\"", "\\\"")}\"";

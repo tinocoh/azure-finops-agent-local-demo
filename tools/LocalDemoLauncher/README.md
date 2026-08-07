@@ -14,6 +14,15 @@ It is intentionally separate from the committee review repo so the OSS review pa
 
 ## Modes
 
+Before showing the menu, the launcher runs a prerequisite check for:
+
+- Git
+- .NET 10 SDK
+- Node.js/npm
+- Azure CLI availability for provisioning/cleanup
+
+If a required tool is missing on Windows and `winget` is available, the launcher offers to install it. After installation, the user may need to close the launcher and open a new terminal so the updated PATH is visible.
+
 1. **Provision minimal Azure OpenAI resources**
    - Runs `az login` if needed.
    - Lets the user choose a subscription.
@@ -84,3 +93,27 @@ When cleanup is confirmed, the launcher:
 3. Deletes `%APPDATA%\Microsoft\UserSecrets\azure-finops-agent-dashboard`.
 
 If the user configured an existing Azure OpenAI endpoint manually, cleanup deletes local secrets but does not delete that existing Azure resource.
+
+## Troubleshooting
+
+### Azure CLI appears installed but the launcher says it is missing
+
+On Windows, Azure CLI is commonly exposed as `az.cmd`. A normal Command Prompt can run `az login`, while a launcher that invokes `az` incorrectly may fail to detect it. The launcher now resolves `az` through `cmd.exe` to match the user's shell behavior.
+
+If detection still fails:
+
+1. Close the launcher.
+2. Open a new Command Prompt or PowerShell window.
+3. Run:
+
+   ```powershell
+   az --version
+   ```
+
+4. If that works, run the launcher again.
+
+If `az --version` does not work, install Azure CLI:
+
+```powershell
+winget install --id Microsoft.AzureCLI --exact --source winget
+```
