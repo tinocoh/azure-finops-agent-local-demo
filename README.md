@@ -24,6 +24,25 @@ description: Analyze Azure cost, inventory, Advisor recommendations, and FinOps 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Azure-Samples/azure-finops-agent)
 [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/Azure-Samples/azure-finops-agent)
 
+> Local demo-first fork: this repository is used to prototype a low-friction local demo launcher. The launcher can sign the user into Azure, provision minimal Azure OpenAI demo resources with explicit cost consent, configure local .NET User Secrets, run the Dashboard locally, and clean up both demo resources and local secrets.
+
+## Local demo launcher prototype
+
+The Windows launcher prototype lives in:
+
+```text
+tools/LocalDemoLauncher
+```
+
+It supports:
+
+- provisioning minimal Azure OpenAI demo resources after explicit cost/permission consent,
+- using an existing Azure OpenAI endpoint,
+- running the local Dashboard with current configuration,
+- deleting the launcher-created resource group and local .NET User Secrets during cleanup.
+
+See [`tools/LocalDemoLauncher/README.md`](tools/LocalDemoLauncher/README.md) for the local demo flow, secret handling, and cleanup guarantees.
+
 Azure FinOps Agent is a sample for building a secure FinOps assistant on Azure. It combines a .NET agent experience, an MCP server for Azure cost intelligence, and a FastAPI/React analyzer for cost, inventory, Advisor recommendations, and optimization opportunities.
 
 The sample is designed for regulated environments: Azure services use managed identity and RBAC, Azure OpenAI local key authentication is disabled, audit-safe read-only mode is enabled by default, and private networking can be enabled through the Bicep parameters.
