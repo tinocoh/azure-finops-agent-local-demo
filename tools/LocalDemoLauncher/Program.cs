@@ -4,7 +4,7 @@ using System.Text.Json;
 
 const string repoUrl = "https://github.com/tinocoh/azure-finops-agent.git";
 const string appUserSecretsId = "azure-finops-agent-dashboard";
-var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+var repoRoot = Path.Combine(@"C:\dev", "azure-finops-agent");
 var dashboardRoot = Path.Combine(repoRoot, "agent", "src", "Dashboard");
 var webuiRoot = Path.Combine(dashboardRoot, "webui");
 var stateDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AzureFinOpsAgentDemoLauncher");
