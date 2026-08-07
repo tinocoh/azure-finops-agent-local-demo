@@ -117,3 +117,14 @@ If `az --version` does not work, install Azure CLI:
 ```powershell
 winget install --id Microsoft.AzureCLI --exact --source winget
 ```
+
+### Build fails while downloading GitHub Copilot CLI
+
+The Dashboard build depends on a native GitHub Copilot CLI package. Some corporate machines can download npm packages with `npm`, but MSBuild's direct download step can fail with TLS errors such as:
+
+```text
+Failed to download file "https://registry.npmjs.org/@github/copilot-win32-arm64/..."
+Authentication failed because the remote party sent a TLS alert: HandshakeFailure
+```
+
+The launcher now pre-seeds the Copilot CLI build cache with `npm pack` before running `dotnet build`. It seeds both Windows x64 and ARM64 variants so Surface/ARM devices and x64 devices both work.

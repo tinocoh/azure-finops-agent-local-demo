@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 const string repoUrl = "https://github.com/tinocoh/azure-finops-agent.git";
 const string appUserSecretsId = "azure-finops-agent-dashboard";
+const string copilotCliVersion = "1.0.46";
 var repoRoot = Path.Combine(@"C:\dev", "azure-finops-agent");
 var dashboardRoot = Path.Combine(repoRoot, "agent", "src", "Dashboard");
 var webuiRoot = Path.Combine(dashboardRoot, "webui");
@@ -184,6 +186,7 @@ void BuildAndRun()
 
     Run("npm", "ci --no-audit --no-fund", webuiRoot);
     Run("npm", "run build", webuiRoot);
+    EnsureCopilotCliCache();
     Run("dotnet", "build -c Release", dashboardRoot);
 
     if (IsPortListening(5000))
@@ -293,6 +296,62 @@ void DeleteUserSecrets()
 void SaveState(DemoState state)
 {
     File.WriteAllText(stateFile, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
+}
+
+void EnsureCopilotCliCache()
+{
+    Header("Checking Copilot CLI build dependency");
+    var platforms = GetCopilotPlatformsToSeed();
+    foreach (var platform in platforms)
+    {
+        var cacheDir = Path.Combine(dashboardRoot, "obj", "Release", "net10.0", "copilot-cli", copilotCliVersion, platform);
+        var binary = Path.Combine(cacheDir, "copilot.exe");
+        if (File.Exists(binary))
+        {
+            Line($"OK: Copilot CLI cache for {platform}");
+            continue;
+        }
+
+        Warn($"Copilot CLI cache missing for {platform}. Seeding with npm to avoid MSBuild TLS download failures.");
+        Directory.CreateDirectory(cacheDir);
+        var packDir = Path.Combine(Path.GetTempPath(), "azure-finops-agent-copilot-cli", platform, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(packDir);
+        try
+        {
+            Run("npm", $"pack @github/copilot-{platform}@{copilotCliVersion} --silent", packDir);
+            var archive = Directory.GetFiles(packDir, $"github-copilot-{platform}-{copilotCliVersion}.tgz").FirstOrDefault()
+                ?? Directory.GetFiles(packDir, "*.tgz").FirstOrDefault()
+                ?? throw new InvalidOperationException($"npm pack did not produce a Copilot CLI archive for {platform}.");
+            Run("tar", $"-xzf {Quote(archive)} --strip-components=1 -C {Quote(cacheDir)}", packDir);
+            if (!File.Exists(binary))
+            {
+                throw new InvalidOperationException($"Copilot CLI archive extracted but {binary} was not found.");
+            }
+            Line($"OK: Copilot CLI cache seeded for {platform}");
+        }
+        finally
+        {
+            try { Directory.Delete(packDir, recursive: true); } catch { }
+        }
+    }
+}
+
+static string[] GetCopilotPlatformsToSeed()
+{
+    if (!OperatingSystem.IsWindows()) return [];
+
+    var current = RuntimeInformation.ProcessArchitecture switch
+    {
+        Architecture.Arm64 => "win32-arm64",
+        Architecture.X64 => "win32-x64",
+        _ => "win32-x64"
+    };
+
+    // Seed both Windows platforms. This is cheap and avoids false negatives when
+    // the launcher is x64 but the installed .NET SDK is native ARM64, or vice versa.
+    return current == "win32-arm64"
+        ? ["win32-arm64", "win32-x64"]
+        : ["win32-x64", "win32-arm64"];
 }
 
 string Azure(string arguments) => RunCapture("az", arguments, repoRoot);
