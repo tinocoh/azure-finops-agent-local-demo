@@ -16,6 +16,6 @@
   "dependencies": {
     "@microsoft/applicationinsights-web": "^3.3.11",
     "echarts": "^6.0.0",
-    "highlight.js": "^11.11.1"
+    "highlight.js": "^11.12.0"
   }
 }
